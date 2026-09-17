@@ -280,60 +280,15 @@ Run this standard gate before every commit:
 
 ```bash
 source .venv/bin/activate
-tox -e check
-```
-
-Equivalent expanded commands:
-
-```bash
-source .venv/bin/activate
 ruff check .
 ruff format --check .
 pyright
 mypy sync/ --strict
-vulture sync/ --min-confidence 80
 lint-imports --config .importlinter
-deptry . --pep621-dev-dependency-groups dev --package-module-name-map tox=tox,mutmut=mutmut,pip-audit=pip_audit
 python3 -m pytest tests/ -o addopts="-q --tb=short --cov=sync --cov-branch --cov-report="
 ```
 
-Extended strict gate (security + mutation):
-
-```bash
-source .venv/bin/activate
-tox -e extended
-```
-
-`tox -e extended` is mutation-strict. It fails when `mutmut results` reports any
-non-killed status (`survived`, `no tests`, `timeout`, or other non-killed
-states).
-`extended` runs `mutmut` with `--max-children 1` to reduce false timeout noise
-from parallel worker contention.
-
-Literal everything gate (check + extended):
-
-```bash
-source .venv/bin/activate
-tox -e all
-```
-
-Recommended run protocol:
-
-1. Inner loop while editing:
-```bash
-source .venv/bin/activate
-tox -e check
-```
-2. Before every commit:
-```bash
-source .venv/bin/activate
-tox -e check
-```
-3. Before large refactors or release-ready changes:
-```bash
-source .venv/bin/activate
-tox -e all
-```
+All tools above are installed by the `dev` extra (`pip install -e ".[dev]"`).
 
 When debugging a failing test or coverage regression, rerun with verbose reporting:
 
