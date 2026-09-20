@@ -122,6 +122,9 @@ def monthly_training_grid_spec(
     daily_data: dict[datetime.date, DailyAggregate],
     *,
     current_date: datetime.date | None,
+    workout_count: int,
+    stretch_count: int,
+    elapsed_days: int,
     workout_delta_labels: Sequence[str] | None = None,
     stretch_delta_labels: Sequence[str] | None = None,
 ) -> MonthlyTrainingGridSpec:
@@ -141,6 +144,9 @@ def monthly_training_grid_spec(
 
     current_week_idx, current_day_idx = _current_bucket_index(week_ranges, current_date)
     return MonthlyTrainingGridSpec(
+        workout_count=workout_count,
+        stretch_count=stretch_count,
+        elapsed_days=elapsed_days,
         week_labels=week_labels,
         week_day_counts=week_day_counts,
         workout_symbols=workout_symbols,

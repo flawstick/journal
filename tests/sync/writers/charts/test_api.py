@@ -1,8 +1,7 @@
 from __future__ import annotations
 
 from sync.writers.charts import (
-    TEST_CHART,
-    TrainingBlockRowsSpec,
+    WEEKLY_7DAY_CHART,
     TrainingCalendarColumn,
     TrainingCalendarColumnsSpec,
     TrainingCalendarMonth,
@@ -19,7 +18,7 @@ def test_vertical_bar_chart_renders_fenced_chart():
             labels=("MON", "TUE"),
             values=(60.0, 120.0),
             value_labels=("1h", "2h"),
-            profile=TEST_CHART,
+            profile=WEEKLY_7DAY_CHART,
         )
     )
 
@@ -42,22 +41,6 @@ def test_weekly_training_grid_renders_current_marker():
 
     assert lines[4] == "│          ─── ─── ─── ─── ─── ─── ───"
     assert lines[5] == "└          MON TUE WED THU FRI SAT SUN"
-
-
-def test_training_block_rows_renders_counts_without_full_study_day_specs():
-    lines = render_chart(
-        TrainingBlockRowsSpec(
-            labels=("STRETCH", "WORKOUT"),
-            counts=((2, 7), (3, 7)),
-            bar_width=5,
-        )
-    )
-
-    text = "\n".join(lines)
-    assert "STRETCH" in text
-    assert "02/07" in text
-    assert "WORKOUT" in text
-    assert "03/07" in text
 
 
 def test_training_calendar_columns_render_month_strips_side_by_side():

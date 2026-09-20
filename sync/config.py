@@ -40,17 +40,20 @@ class LoggingConfig:
     format: str
 
 
-def _resolve_path(value: str) -> str:
-    return os.path.expanduser(value)
-
-
 def _env_path(name: str, default: str) -> str:
-    return _resolve_path(os.environ.get(name, default))
+    return os.path.expanduser(os.environ.get(name, default))
 
 
 def _build_paths() -> PathConfig:
-    home_dir = _resolve_path("~")
-    default_vault_dir = os.path.join(home_dir, "Documents", "Obsidian", "the-vault")
+    home_dir = os.path.expanduser("~")
+    default_vault_dir = os.path.join(
+        home_dir,
+        "Library",
+        "Mobile Documents",
+        "iCloud~md~obsidian",
+        "Documents",
+        "the-vault",
+    )
     vault_dir = _env_path("VAULT_DIR", default_vault_dir)
     journal_dir = _env_path("JOURNAL_DIR", os.path.join(vault_dir, "journal"))
     notes_dir = os.path.join(vault_dir, "notes")
@@ -157,11 +160,4 @@ def _build_paths() -> PathConfig:
 PATHS = _build_paths()
 
 
-def _build_logging() -> LoggingConfig:
-    return LoggingConfig(
-        level="INFO",
-        format="text",
-    )
-
-
-LOGGING = _build_logging()
+LOGGING = LoggingConfig(level="INFO", format="text")

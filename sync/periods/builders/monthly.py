@@ -191,21 +191,11 @@ def build_monthly_metrics(
             workout_delta_labels=workout_delta_labels,
             stretch_delta_labels=stretch_delta_labels,
             current_date=current_month_date,
+            workout_count=workout_days,
+            stretch_count=stretch_days,
+            elapsed_days=current_metrics["days_up_to_today"] or days_in_period,
         )
     )
-    # Inject counts into headers of the grid lines
-    elapsed_days = current_metrics["days_up_to_today"] or days_in_period
-    if training_grid:
-        for idx, line in enumerate(training_grid):
-            if line.startswith("┌ WORKOUT"):
-                training_grid[idx] = (
-                    f"┌ WORKOUT ({workout_days:02d}/{elapsed_days:02d})"
-                )
-            if line.startswith("┌ STRETCH"):
-                training_grid[idx] = (
-                    f"┌ STRETCH ({stretch_days:02d}/{elapsed_days:02d})"
-                )
-
     training_lines.extend(training_grid)
     training_lines.append("")
     append_training_type_table(training_lines, dates, daily_data)

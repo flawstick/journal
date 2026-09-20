@@ -38,32 +38,30 @@ class PeriodSyncService:
     aggregate_source: DailyAggregateSource
     media_source: MediaSource
 
-    def _load_range(
+    def _load_period_data(
         self,
-        start_date: datetime.date,
-        end_date: datetime.date,
-    ) -> dict[datetime.date, DailyAggregate]:
-        dates = list(daterange(start_date, end_date))
-        return self.aggregate_source.load_for_dates(dates)
-
-    def _load_dates(
-        self,
-        dates: list[datetime.date],
-    ) -> dict[datetime.date, DailyAggregate]:
-        return self.aggregate_source.load_for_dates(dates)
-
-    def _load_prior_metrics(
-        self,
-        offsets: range,
-        bounds_for_offset: Callable[[int], tuple[datetime.date, datetime.date]],
-    ) -> list[PeriodAggregate]:
-        metrics_list: list[PeriodAggregate] = []
-        for offset in offsets:
-            start_date, end_date = bounds_for_offset(offset)
-            dates = list(daterange(start_date, end_date))
-            daily_data = self._load_dates(dates)
-            metrics_list.append(compute_period_metrics(dates, daily_data))
-        return metrics_list
+        window: WeekWindow | MonthWindow | YearWindow,
+        prior_count: int,
+    ) -> tuple[
+        dict[datetime.date, DailyAggregate],
+        dict[datetime.date, DailyAggregate],
+        list[PeriodAggregate],
+    ]:
+        current_dates = list(daterange(window.start, window.end))
+        prior_dates = [
+            list(daterange(*window.prior_bounds(offset)))
+            for offset in range(prior_count, 0, -1)
+        ]
+        all_dates = sorted(set(current_dates).union(*prior_dates))
+        daily_data = self.aggregate_source.load_for_dates(all_dates)
+        current = {day: daily_data[day] for day in current_dates if day in daily_data}
+        previous = {
+            day: daily_data[day] for day in prior_dates[-1] if day in daily_data
+        }
+        prior_metrics = [
+            compute_period_metrics(dates, daily_data) for dates in prior_dates
+        ]
+        return current, previous, prior_metrics
 
     def sync_week(
         self,
@@ -73,15 +71,8 @@ class PeriodSyncService:
         cleanup_previous: bool,
         cleanup_previous_runner: Callable[[], None] | None = None,
     ) -> None:
-        week_dates = list(daterange(window.start, window.end))
-        daily_data = self._load_dates(week_dates)
-
-        prev_week_dates = list(daterange(window.previous_start, window.previous_end))
-        prev_daily_data = self._load_dates(prev_week_dates)
-
-        prior_week_metrics = self._load_prior_metrics(
-            range(4, 0, -1),
-            window.prior_bounds,
+        daily_data, prev_daily_data, prior_week_metrics = self._load_period_data(
+            window, 4
         )
         media_bundle = self.media_source.scan(window.start, window.end)
 
@@ -114,19 +105,10 @@ class PeriodSyncService:
         cleanup_previous: bool,
         cleanup_previous_runner: Callable[[], None] | None = None,
     ) -> None:
-        month_start, month_end = window.start, window.end
-
-        month_dates = list(daterange(month_start, month_end))
-        daily_data = self._load_dates(month_dates)
-
-        prev_month_dates = list(daterange(window.previous_start, window.previous_end))
-        prev_daily_data = self._load_dates(prev_month_dates)
-
-        prior_month_metrics = self._load_prior_metrics(
-            range(3, 0, -1),
-            window.prior_bounds,
+        daily_data, prev_daily_data, prior_month_metrics = self._load_period_data(
+            window, 3
         )
-        media_bundle = self.media_source.scan(month_start, month_end)
+        media_bundle = self.media_source.scan(window.start, window.end)
 
         metrics_block = build_monthly_metrics(
             window,
@@ -150,12 +132,8 @@ class PeriodSyncService:
         )
 
     def sync_year(self, window: YearWindow, note_path: str) -> None:
-        year_dates = list(daterange(window.start, window.end))
-        daily_data = self._load_dates(year_dates)
-        prev_daily_data = self._load_range(window.previous_start, window.previous_end)
-        prior_year_metrics = self._load_prior_metrics(
-            range(3, 0, -1),
-            window.prior_bounds,
+        daily_data, prev_daily_data, prior_year_metrics = self._load_period_data(
+            window, 3
         )
         media_bundle = self.media_source.scan(window.start, window.end)
 

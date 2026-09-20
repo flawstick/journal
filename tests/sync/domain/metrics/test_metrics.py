@@ -15,7 +15,6 @@ from sync.contracts.metrics import TrainingOccurrence
 from sync.metrics import (
     compute_period_metrics,
     aggregate_activity_totals,
-    aggregate_interrupt_overrun,
     aggregate_training_type_session_stats,
     compute_bucket_deltas,
 )
@@ -137,56 +136,6 @@ class TestAggregateActivityTotals:
         daily_data = {datetime.date(2025, 1, 1): {}}  # No activity_totals key
         result = aggregate_activity_totals(dates, daily_data)
         assert result == {}
-
-
-class TestAggregateInterruptOverrun:
-    """Tests for aggregate_interrupt_overrun function."""
-
-    def test_totals_interrupts(self, sample_daily_data):
-        dates = list(sample_daily_data.keys())
-        interrupts, overruns, study_days = aggregate_interrupt_overrun(
-            dates, sample_daily_data
-        )
-
-        # Sum of interrupt_minutes: 10 + 5 + 0 + 15 = 30
-        expected_interrupts = sum(
-            d.get("interrupt_minutes", 0) for d in sample_daily_data.values()
-        )
-        assert interrupts == expected_interrupts
-
-    def test_totals_overruns(self, sample_daily_data):
-        dates = list(sample_daily_data.keys())
-        interrupts, overruns, study_days = aggregate_interrupt_overrun(
-            dates, sample_daily_data
-        )
-
-        # Sum of overrun_minutes: 5 + 0 + 0 + 10 = 15
-        expected_overruns = sum(
-            d.get("overrun_minutes", 0) for d in sample_daily_data.values()
-        )
-        assert overruns == expected_overruns
-
-    def test_counts_study_days(self, sample_daily_data):
-        dates = list(sample_daily_data.keys())
-        interrupts, overruns, study_days = aggregate_interrupt_overrun(
-            dates, sample_daily_data
-        )
-
-        # Days with study > 0: 420, 180, 0, 360 -> 3 study days
-        expected_count = sum(
-            1 for d in sample_daily_data.values() if d.get("study_minutes", 0) > 0
-        )
-        assert study_days == expected_count
-
-    def test_handles_empty_data(self):
-        dates = [datetime.date(2025, 1, 1)]
-        daily_data = {}
-        interrupts, overruns, study_days = aggregate_interrupt_overrun(
-            dates, daily_data
-        )
-        assert interrupts == 0
-        assert overruns == 0
-        assert study_days == 0
 
 
 class TestComputeBucketDeltas:

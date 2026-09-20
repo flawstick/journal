@@ -25,6 +25,11 @@ from sync.writers.tables import SimpleGridTableSpec, render_table
 logger = get_logger(__name__)
 
 
+def _require_cache_key(key: str, path: str) -> None:
+    if not key:
+        raise ValueError(f"Media cache key must not be empty: {path}")
+
+
 def _heal_frontmatter_date(
     note_store: NoteStore,
     filepath: str,
@@ -119,6 +124,7 @@ def _scan_books(
         parsed = parse_book_note(title, lines)
         if parsed is None:
             continue
+        _require_cache_key(title, filepath)
         completed_date = parsed.completed
 
         # Cache check and healing for completed date
@@ -208,6 +214,7 @@ def _scan_podcast_directory(
             continue
         podcast_date = podcast.date
         cache_key = f"{key_prefix}{title}"
+        _require_cache_key(cache_key, filepath)
 
         # Cache check and healing
         cached_date_str = cache.get(cache_key)

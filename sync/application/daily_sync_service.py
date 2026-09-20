@@ -6,7 +6,6 @@ import datetime
 import os
 
 from sync.constants import JOURNAL_DIR
-from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.study import StudySessionRecord
 from sync.daily.composer import DailyNoteComposer
 from sync.daily.constants import TEMPLATE_PATH
@@ -44,7 +43,6 @@ class DailySyncService:
         self,
         day: datetime.date,
         sessions: list[StudySessionRecord],
-        day_schedule: DayScheduleProfile,
     ) -> bool | None:
         """Synchronize the daily note for a specific date."""
         today_str = day.isoformat()
@@ -59,7 +57,6 @@ class DailySyncService:
             base_lines,
             day=day,
             sessions=sessions,
-            day_schedule=day_schedule,
         )
         updated_lines = compose_result.updated_lines
 

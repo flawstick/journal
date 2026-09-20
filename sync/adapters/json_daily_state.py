@@ -2,14 +2,18 @@
 
 from __future__ import annotations
 
+import datetime
+import os
 from typing import cast
 
 from sync.constants import LOCK_DIR, TRAINING_STATE_DIR
 from sync.contracts.state import DailyTrainingStateRow
 from sync.ports.state import DailyTrainingStateStore
+from sync.notes.locking import locked_path
 
 from .json_cache_common import (
-    JsonValidatedPerDateStore,
+    atomic_write_json,
+    load_json_or_none,
     schema_error,
 )
 
@@ -98,10 +102,7 @@ def _validate_training_payload(
     return typed_entries
 
 
-class JsonDailyTrainingStateStore(
-    JsonValidatedPerDateStore[list[DailyTrainingStateRow]],
-    DailyTrainingStateStore,
-):
+class JsonDailyTrainingStateStore(DailyTrainingStateStore):
     """Filesystem-backed per-day training state store."""
 
     def __init__(
@@ -110,9 +111,37 @@ class JsonDailyTrainingStateStore(
         state_dir: str | None = None,
         lock_root: str | None = None,
     ) -> None:
-        super().__init__(
-            cache_dir=state_dir or TRAINING_STATE_DIR,
-            lock_root=lock_root or LOCK_DIR,
-            empty_entries=list,
-            validator=_validate_training_payload,
-        )
+        self.state_dir = state_dir or TRAINING_STATE_DIR
+        self.lock_root = lock_root or LOCK_DIR
+
+    def load_for_date(self, date_str: str) -> list[DailyTrainingStateRow]:
+        path = os.path.join(self.state_dir, f"{date_str}.json")
+        with locked_path(path, lock_root=self.lock_root):
+            raw = load_json_or_none(path)
+        if raw is None:
+            return []
+        return _validate_training_payload(raw, path=path, date_str=date_str)
+
+    def save_for_date(
+        self, date_str: str, entries: list[DailyTrainingStateRow]
+    ) -> None:
+        path = os.path.join(self.state_dir, f"{date_str}.json")
+        with locked_path(path, lock_root=self.lock_root):
+            atomic_write_json(path, {"date": date_str, "entries": entries})
+
+    def prune(self, *, keep_days: int) -> None:
+        if keep_days <= 0 or not os.path.isdir(self.state_dir):
+            return
+        cutoff = datetime.date.today() - datetime.timedelta(days=keep_days - 1)
+        for name in os.listdir(self.state_dir):
+            if not name.endswith(".json"):
+                continue
+            try:
+                file_date = datetime.datetime.strptime(name[:-5], "%Y-%m-%d").date()
+            except ValueError:
+                continue
+            if file_date < cutoff:
+                try:
+                    os.remove(os.path.join(self.state_dir, name))
+                except OSError:
+                    pass

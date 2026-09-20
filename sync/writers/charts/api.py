@@ -2,56 +2,31 @@
 
 from __future__ import annotations
 
+from .renderers.calendar_columns import render_training_calendar_columns
 from .renderers.grouped_grid import (
     render_monthly_training_grid,
     render_weekly_training_grid,
-)
-from .renderers.calendar_columns import render_training_calendar_columns
-from .renderers.progress_rows import (
-    render_training_block_rows,
-    render_training_sections_rows,
 )
 from .renderers.vertical import render_vertical_bar
 from .specs import (
     ChartSpec,
     MonthlyTrainingGridSpec,
-    TrainingBlockRowsSpec,
     TrainingCalendarColumnsSpec,
-    TrainingSectionsRowsSpec,
     VerticalBarSpec,
     WeeklyTrainingGridSpec,
 )
-from .._dispatch import Renderer, render_exact_type, typed_renderer
-
-
-def _fence(lines: list[str]) -> list[str]:
-    if not lines:
-        return []
-    return ["```", *lines, "```"]
-
-
-_RENDERERS: dict[type[object], Renderer] = {
-    VerticalBarSpec: typed_renderer(VerticalBarSpec, render_vertical_bar),
-    MonthlyTrainingGridSpec: typed_renderer(
-        MonthlyTrainingGridSpec, render_monthly_training_grid
-    ),
-    WeeklyTrainingGridSpec: typed_renderer(
-        WeeklyTrainingGridSpec, render_weekly_training_grid
-    ),
-    TrainingBlockRowsSpec: typed_renderer(
-        TrainingBlockRowsSpec, render_training_block_rows
-    ),
-    TrainingSectionsRowsSpec: typed_renderer(
-        TrainingSectionsRowsSpec, render_training_sections_rows
-    ),
-    TrainingCalendarColumnsSpec: typed_renderer(
-        TrainingCalendarColumnsSpec, render_training_calendar_columns
-    ),
-}
 
 
 def render_chart(spec: ChartSpec) -> list[str]:
-    """Render any chart from its typed specification."""
-    return _fence(
-        render_exact_type(spec=spec, renderers=_RENDERERS, kind_label="chart")
-    )
+    """Render a chart and enclose its body in a Markdown fence."""
+    if isinstance(spec, VerticalBarSpec):
+        lines = render_vertical_bar(spec)
+    elif isinstance(spec, MonthlyTrainingGridSpec):
+        lines = render_monthly_training_grid(spec)
+    elif isinstance(spec, WeeklyTrainingGridSpec):
+        lines = render_weekly_training_grid(spec)
+    elif isinstance(spec, TrainingCalendarColumnsSpec):
+        lines = render_training_calendar_columns(spec)
+    else:
+        raise ValueError(f"Unsupported chart spec: {type(spec)!r}")
+    return ["```", *lines, "```"] if lines else []

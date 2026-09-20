@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-
-from sync.contracts.metrics import MetricValue
 from sync.formatting import (
     compute_pace,
     format_ma_training_ratio,
@@ -13,44 +10,6 @@ from sync.formatting import (
 )
 
 from ..specs import SummaryMetricsTableSpec
-
-
-def _metric_float(metrics: Mapping[str, MetricValue], key: str) -> float | None:
-    value = metrics.get(key)
-    if isinstance(value, (int, float)):
-        return float(value)
-    return None
-
-
-def _metric_int(metrics: Mapping[str, MetricValue], key: str) -> int | None:
-    value = metrics.get(key)
-    if isinstance(value, int):
-        return value
-    if isinstance(value, float) and value.is_integer():
-        return int(value)
-    return None
-
-
-def _metric_float_or(
-    metrics: Mapping[str, MetricValue],
-    key: str,
-    default: float,
-) -> float:
-    value = _metric_float(metrics, key)
-    if value is None:
-        return default
-    return value
-
-
-def _metric_int_or(
-    metrics: Mapping[str, MetricValue],
-    key: str,
-    default: int,
-) -> int:
-    value = _metric_int(metrics, key)
-    if value is None:
-        return default
-    return value
 
 
 def _append_summary_row(
@@ -99,21 +58,15 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         lines.append(f"| METRIC | {current_label} | {previous_label} |")
         lines.append("| ------ | ------------- | ----------------------- |")
 
-    curr_study_total = _metric_float_or(current_metrics, "study_total_minutes", 0.0)
-    prev_study_total = _metric_float_or(previous_metrics, "study_total_minutes", 0.0)
-    curr_days_for_avg = _metric_int_or(
-        current_metrics, "days_up_to_today", 0
-    ) or _metric_int_or(
-        current_metrics,
-        "total_days",
-        7,
+    curr_study_total = current_metrics["study_total_minutes"]
+    prev_study_total = previous_metrics["study_total_minutes"]
+    curr_days_for_avg = (
+        current_metrics["days_up_to_today"] or current_metrics["total_days"]
     )
-    prev_days_for_avg = _metric_int_or(
-        previous_metrics,
-        "days_up_to_today",
-        0,
-    ) or _metric_int_or(previous_metrics, "total_days", 7)
-    prev_total_days = _metric_int_or(previous_metrics, "total_days", 7)
+    prev_days_for_avg = (
+        previous_metrics["days_up_to_today"] or previous_metrics["total_days"]
+    )
+    prev_total_days = previous_metrics["total_days"]
 
     curr_study_avg_mins = compute_pace(curr_study_total, curr_days_for_avg)
     curr_study_avg = format_minutes(curr_study_avg_mins, always_show_both=True) + "/day"
@@ -121,9 +74,7 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
     prev_study_avg = format_minutes(prev_study_avg_mins, always_show_both=True) + "/day"
 
     ma_study_str = "—"
-    ma_study_minutes = (
-        _metric_float(ma_metrics, "study_avg_minutes") if ma_metrics else None
-    )
+    ma_study_minutes = ma_metrics["study_avg_minutes"] if ma_metrics else None
     if show_ma and ma_study_minutes is not None:
         ma_study_str = format_minutes(ma_study_minutes, always_show_both=True) + "/day"
 
@@ -136,15 +87,13 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         ma_value=ma_study_str,
     )
 
-    curr_sleep_avg = _metric_float(current_metrics, "sleep_avg_minutes")
-    prev_sleep_avg = _metric_float(previous_metrics, "sleep_avg_minutes")
+    curr_sleep_avg = current_metrics["sleep_avg_minutes"]
+    prev_sleep_avg = previous_metrics["sleep_avg_minutes"]
     curr_sleep = _format_optional_minutes(curr_sleep_avg)
     prev_sleep = _format_optional_minutes(prev_sleep_avg)
 
     ma_sleep_str = "—"
-    ma_sleep_avg = (
-        _metric_float(ma_metrics, "sleep_avg_minutes") if ma_metrics else None
-    )
+    ma_sleep_avg = ma_metrics["sleep_avg_minutes"] if ma_metrics else None
     if show_ma and ma_sleep_avg is not None:
         ma_sleep_str = format_minutes(ma_sleep_avg, always_show_both=True)
 
@@ -157,13 +106,13 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         ma_value=ma_sleep_str,
     )
 
-    curr_workout_count = _metric_int_or(current_metrics, "workout_count", 0)
-    prev_workout_count = _metric_int_or(previous_metrics, "workout_count", 0)
+    curr_workout_count = current_metrics["workout_count"]
+    prev_workout_count = previous_metrics["workout_count"]
     curr_workout = format_training_ratio(curr_workout_count, curr_days_for_avg)
     prev_workout = format_training_ratio(prev_workout_count, prev_total_days)
 
     ma_workout_str = "—"
-    ma_workout_avg = _metric_float(ma_metrics, "workout_avg") if ma_metrics else None
+    ma_workout_avg = ma_metrics["workout_avg"] if ma_metrics else None
     if show_ma and ma_workout_avg is not None:
         ma_workout_str = format_ma_training_ratio(ma_workout_avg, ma_training_unit)
 
@@ -176,13 +125,13 @@ def render_summary_metrics(spec: SummaryMetricsTableSpec) -> list[str]:
         ma_value=ma_workout_str,
     )
 
-    curr_stretch_count = _metric_int_or(current_metrics, "stretch_count", 0)
-    prev_stretch_count = _metric_int_or(previous_metrics, "stretch_count", 0)
+    curr_stretch_count = current_metrics["stretch_count"]
+    prev_stretch_count = previous_metrics["stretch_count"]
     curr_stretch = format_training_ratio(curr_stretch_count, curr_days_for_avg)
     prev_stretch = format_training_ratio(prev_stretch_count, prev_total_days)
 
     ma_stretch_str = "—"
-    ma_stretch_avg = _metric_float(ma_metrics, "stretch_avg") if ma_metrics else None
+    ma_stretch_avg = ma_metrics["stretch_avg"] if ma_metrics else None
     if show_ma and ma_stretch_avg is not None:
         ma_stretch_str = format_ma_training_ratio(ma_stretch_avg, ma_training_unit)
 

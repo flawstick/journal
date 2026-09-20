@@ -31,7 +31,6 @@ def isolate_cache_dirs(tmp_path, monkeypatch):
     )
     monkeypatch.setattr("sync.adapters.json_daily_state.LOCK_DIR", str(lock_dir))
     monkeypatch.setattr("sync.adapters.markdown_notes.LOCK_DIR", str(lock_dir))
-    monkeypatch.setattr("sync.notes.locking._PRUNED_LOCK_ROOTS", set())
 
     yield
 

@@ -153,22 +153,19 @@ def test_flow_automation_uses_journal_launchd_labels() -> None:
     assert flow_automation.REMIND_LAUNCHD_LABEL == "com.edo.journal.remind"
 
 
-def _wiring_deps(
+def _patch_daily_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
     *,
     session_source_factory,
     status_source_factory,
     schedule_source_factory,
-) -> wiring.WiringDeps:
-    return wiring.WiringDeps(
-        bootstrap_storage_layout=lambda: None,
-        session_source_factory=session_source_factory,
-        status_source_factory=status_source_factory,
-        note_store_factory=lambda: object(),
-        training_state_store_factory=lambda: object(),
-        aggregate_source_factory=lambda: object(),
-        media_source_factory=lambda: object(),
-        schedule_source_factory=schedule_source_factory,
-    )
+) -> None:
+    monkeypatch.setattr(wiring, "bootstrap_storage_layout", lambda: None)
+    monkeypatch.setattr(wiring, "FlowStudySessionSource", session_source_factory)
+    monkeypatch.setattr(wiring, "ICloudDailyStatusSource", status_source_factory)
+    monkeypatch.setattr(wiring, "MarkdownScheduleSource", schedule_source_factory)
+    monkeypatch.setattr(wiring, "MarkdownNoteStore", object)
+    monkeypatch.setattr(wiring, "JsonDailyTrainingStateStore", object)
 
 
 class _StubMediaCacheStore:
@@ -393,9 +390,7 @@ def test_run_daily_sync_non_today_days_first_then_today(
             self,
             day: date,
             sessions: list[dict[str, str]],
-            day_schedule: DayScheduleProfile,
         ) -> bool:
-            assert day_schedule == _default_schedule()
             synced_days.append((day, sessions))
             return True
 
@@ -406,12 +401,13 @@ def test_run_daily_sync_non_today_days_first_then_today(
 
     monkeypatch.setattr(wiring, "DailySyncService", _FakeDailySyncService)
 
-    deps = _wiring_deps(
+    _patch_daily_dependencies(
+        monkeypatch,
         session_source_factory=_FakeSessionSource,
         status_source_factory=lambda: _FakeStatusSource(),
         schedule_source_factory=_FakeScheduleSource,
     )
-    wiring.run_daily_sync(deps=deps)
+    wiring.run_daily_sync()
 
     expected_days = [
         anchor_day - timedelta(days=2),
@@ -454,10 +450,8 @@ def test_run_daily_sync_today_only_when_no_backfill_targets(
             self,
             day: date,
             sessions: list[dict[str, str]],
-            day_schedule: DayScheduleProfile,
         ) -> bool:
             _ = sessions
-            assert day_schedule == _default_schedule()
             synced_days.append(day)
             return True
 
@@ -468,12 +462,13 @@ def test_run_daily_sync_today_only_when_no_backfill_targets(
 
     monkeypatch.setattr(wiring, "DailySyncService", _FakeDailySyncService)
 
-    deps = _wiring_deps(
+    _patch_daily_dependencies(
+        monkeypatch,
         session_source_factory=_FakeSessionSource,
         status_source_factory=lambda: _FakeStatusSource(),
         schedule_source_factory=_FakeScheduleSource,
     )
-    wiring.run_daily_sync(deps=deps)
+    wiring.run_daily_sync()
 
     assert loaded_session_days == [anchor_day]
     assert resolved_schedule_days == [anchor_day]
@@ -506,16 +501,12 @@ def test_monthly_sync_default_anchors_window_to_today(
     monkeypatch.setattr(
         wiring,
         "_build_period_sync_service",
-        lambda *, deps=None: _FakePeriodSyncService(),
+        lambda: _FakePeriodSyncService(),
     )
-    monkeypatch.setattr(wiring, "resolve_note_path", lambda filename: filename)
+    monkeypatch.setattr(wiring, "journal_path", lambda filename: filename)
 
-    deps = _wiring_deps(
-        session_source_factory=lambda: object(),
-        status_source_factory=lambda: object(),
-        schedule_source_factory=lambda: object(),
-    )
-    wiring.run_monthly_sync(month_arg=None, no_cleanup=True, deps=deps)
+    monkeypatch.setattr(wiring, "bootstrap_storage_layout", lambda: None)
+    wiring.run_monthly_sync(month_arg=None, no_cleanup=True)
 
     assert captured == [(date(2026, 6, 19), date(2026, 6, 19))]
 
@@ -546,16 +537,12 @@ def test_monthly_sync_historical_month_has_no_current_marker(
     monkeypatch.setattr(
         wiring,
         "_build_period_sync_service",
-        lambda *, deps=None: _FakePeriodSyncService(),
+        lambda: _FakePeriodSyncService(),
     )
-    monkeypatch.setattr(wiring, "resolve_note_path", lambda filename: filename)
+    monkeypatch.setattr(wiring, "journal_path", lambda filename: filename)
 
-    deps = _wiring_deps(
-        session_source_factory=lambda: object(),
-        status_source_factory=lambda: object(),
-        schedule_source_factory=lambda: object(),
-    )
-    wiring.run_monthly_sync(month_arg="2026-06", no_cleanup=True, deps=deps)
+    monkeypatch.setattr(wiring, "bootstrap_storage_layout", lambda: None)
+    wiring.run_monthly_sync(month_arg="2026-06", no_cleanup=True)
 
     assert captured == [(date(2026, 6, 30), None)]
 
@@ -586,16 +573,12 @@ def test_weekly_sync_historical_week_uses_week_end_without_current_marker(
     monkeypatch.setattr(
         wiring,
         "_build_period_sync_service",
-        lambda *, deps=None: _FakePeriodSyncService(),
+        lambda: _FakePeriodSyncService(),
     )
-    monkeypatch.setattr(wiring, "resolve_note_path", lambda filename: filename)
+    monkeypatch.setattr(wiring, "journal_path", lambda filename: filename)
 
-    deps = _wiring_deps(
-        session_source_factory=lambda: object(),
-        status_source_factory=lambda: object(),
-        schedule_source_factory=lambda: object(),
-    )
-    wiring.run_weekly_sync(date_arg="2026-06-29", no_cleanup=True, deps=deps)
+    monkeypatch.setattr(wiring, "bootstrap_storage_layout", lambda: None)
+    wiring.run_weekly_sync(date_arg="2026-06-29", no_cleanup=True)
 
     assert captured == [(date(2026, 7, 5), None)]
 
@@ -605,26 +588,24 @@ def test_period_all_runs_in_expected_order(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(
         wiring,
         "run_daily_sync",
-        lambda *, deps=None: calls.append("daily"),
+        lambda: calls.append("daily"),
     )
     monkeypatch.setattr(
         wiring,
         "run_weekly_sync",
-        lambda *, date_arg, no_cleanup, deps=None: calls.append(
-            f"weekly:{date_arg}:{no_cleanup}"
-        ),
+        lambda *, date_arg, no_cleanup: calls.append(f"weekly:{date_arg}:{no_cleanup}"),
     )
     monkeypatch.setattr(
         wiring,
         "run_monthly_sync",
-        lambda *, month_arg, no_cleanup, deps=None: calls.append(
+        lambda *, month_arg, no_cleanup: calls.append(
             f"monthly:{month_arg}:{no_cleanup}"
         ),
     )
     monkeypatch.setattr(
         wiring,
         "run_yearly_sync",
-        lambda *, year_arg, deps=None: calls.append(f"yearly:{year_arg}"),
+        lambda *, year_arg: calls.append(f"yearly:{year_arg}"),
     )
 
     rc = cli.main(["period", "all"])
@@ -641,7 +622,7 @@ def test_period_all_runs_in_expected_order(monkeypatch: pytest.MonkeyPatch) -> N
 def test_period_all_is_fail_fast(monkeypatch: pytest.MonkeyPatch) -> None:
     calls: list[str] = []
 
-    def _boom_daily(*, deps=None) -> None:
+    def _boom_daily() -> None:
         calls.append("daily")
         raise RuntimeError("boom")
 
@@ -649,7 +630,7 @@ def test_period_all_is_fail_fast(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         wiring,
         "run_weekly_sync",
-        lambda *, date_arg, no_cleanup, deps=None: calls.append("weekly"),
+        lambda *, date_arg, no_cleanup: calls.append("weekly"),
     )
 
     rc = cli.main(["period", "all"])

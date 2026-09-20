@@ -11,11 +11,6 @@ from sync.ports.notes import NoteStore
 from sync.periods.cleanup import resync_if_marker
 
 
-def resolve_note_path(filename: str, override_path: str | None = None) -> str:
-    """Resolve note path from a filename and optional --file override."""
-    return override_path or journal_path(filename)
-
-
 def journal_path(filename: str) -> str:
     """Resolve a filename into the journal directory."""
     return os.path.join(JOURNAL_DIR, filename)

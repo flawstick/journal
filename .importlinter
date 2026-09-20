@@ -1,5 +1,7 @@
 [importlinter]
-root_package = sync
+root_packages =
+    sync
+    learning
 include_external_packages = True
 
 [importlinter:application_no_adapters]
@@ -65,3 +67,36 @@ source_modules =
     sync.periods
 forbidden_modules =
     sync.run
+
+[importlinter:sync_no_learning]
+name = Journal sync must not depend on learning
+type = forbidden
+source_modules =
+    sync
+forbidden_modules =
+    learning
+
+[importlinter:domain_no_integration]
+name = Domain modules must not construct integrations
+type = forbidden
+source_modules =
+    sync.daily
+    sync.study
+    sync.metrics
+    sync.periods
+    sync.notes
+forbidden_modules =
+    sync.application
+    sync.adapters
+
+[importlinter:learning_study_context]
+name = Learning reads journal data only through study context
+type = forbidden
+source_modules =
+    learning
+forbidden_modules =
+    sync
+allow_indirect_imports = True
+ignore_imports =
+    learning.__main__ -> sync.study.context
+    learning.planning -> sync.study.context

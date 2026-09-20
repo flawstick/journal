@@ -163,19 +163,22 @@ def _load_interruption_totals(
     session_pks: list[int],
 ) -> dict[int, tuple[int, float]]:
     """Load interruption count/duration totals keyed by source session PK."""
-    totals: dict[int, tuple[int, float]] = {}
-    for pk in session_pks:
+    totals = dict.fromkeys(session_pks, (0, 0.0))
+    # Stay within SQLite's minimum supported parameter limit.
+    for offset in range(0, len(session_pks), 999):
+        batch = session_pks[offset : offset + 999]
+        placeholders = ", ".join("?" for _ in batch)
         cursor.execute(
-            """
-            SELECT count(*), sum(ZFINISHEDAT - ZSTARTEDAT)
+            f"""
+            SELECT ZSESSION, count(*), sum(ZFINISHEDAT - ZSTARTEDAT)
             FROM ZINTERRUPTION
-            WHERE ZSESSION = ?
+            WHERE ZSESSION IN ({placeholders})
+            GROUP BY ZSESSION
             """,
-            (pk,),
+            batch,
         )
-        row = cursor.fetchone()
-        if row:
-            totals[pk] = (int(row[0] or 0), float(row[1] or 0))
+        for pk, count, duration in cursor.fetchall():
+            totals[pk] = (int(count), float(duration or 0))
     return totals
 
 

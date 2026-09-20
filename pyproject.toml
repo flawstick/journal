@@ -15,19 +15,26 @@ dev = [
     "hypothesis",
     "import-linter",
     "mypy",
-    "pyright",
     "pytest-cov",
     "pytest",
     "ruff==0.15.0",
 ]
 
 [tool.setuptools.packages.find]
-include = ["sync*"]
+include = ["sync*", "learning*"]
+
+[tool.setuptools.package-data]
+learning = ["pi.ts", "skills/learn/SKILL.md", "skills/learn/scripts/learn", "skills/learn/references/*.md", "clients/claude/teach/SKILL.md", "clients/claude/instructions.md", "clients/codex/instructions.md"]
 
 [tool.coverage.run]
 branch = true
-source = ["sync"]
+source = ["sync", "learning"]
 
 [tool.coverage.report]
 show_missing = true
 skip_covered = true
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q --tb=short"

@@ -4,22 +4,13 @@ from __future__ import annotations
 
 from .renderers.simple_grid import render_simple_grid
 from .renderers.summary_metrics import render_summary_metrics
-from .specs import (
-    SimpleGridTableSpec,
-    SummaryMetricsTableSpec,
-    TableSpec,
-)
-from .._dispatch import Renderer, render_exact_type, typed_renderer
-
-
-_RENDERERS: dict[type[object], Renderer] = {
-    SimpleGridTableSpec: typed_renderer(SimpleGridTableSpec, render_simple_grid),
-    SummaryMetricsTableSpec: typed_renderer(
-        SummaryMetricsTableSpec, render_summary_metrics
-    ),
-}
+from .specs import SimpleGridTableSpec, SummaryMetricsTableSpec, TableSpec
 
 
 def render_table(spec: TableSpec) -> list[str]:
-    """Render any markdown table or table section from its typed spec."""
-    return render_exact_type(spec=spec, renderers=_RENDERERS, kind_label="table")
+    """Render a Markdown table from its typed specification."""
+    if isinstance(spec, SimpleGridTableSpec):
+        return render_simple_grid(spec)
+    if isinstance(spec, SummaryMetricsTableSpec):
+        return render_summary_metrics(spec)
+    raise ValueError(f"Unsupported table spec: {type(spec)!r}")

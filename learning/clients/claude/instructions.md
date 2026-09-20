@@ -1,0 +1,1 @@
+For study sessions and learning-progress questions, start with the teach skill to load the canonical learning workflow; this takes precedence over the general AGENTS.md instruction. Keep retrieval and saving silent; reply only with study content.
