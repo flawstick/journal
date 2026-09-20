@@ -32,8 +32,6 @@ class GlyphSet:
     y_axis: str = "│"
     bar_fill: str = "█"
     bar_half: str = "▄"
-    progress_fill: str = "■"
-    progress_empty: str = "·"
 
 
 @dataclass(frozen=True)
@@ -49,15 +47,6 @@ class ColumnTrack:
 
 
 @dataclass(frozen=True)
-class SegmentTrack:
-    """Segmented row geometry for grouped grid layouts."""
-
-    row_prefix: str = "│ "
-    segment_gap: str = "   "
-    token_sep: str = " "
-
-
-@dataclass(frozen=True)
 class VerticalBarProfile:
     """Rendering policy for vertical-bar charts."""
 
@@ -70,39 +59,6 @@ class VerticalBarProfile:
     x_label_anchor_h: HAnchor = HAnchor.START
     delta_anchor_ref: AnchorRef = AnchorRef.LABEL
     delta_anchor_h: HAnchor = HAnchor.CENTER
-
-
-@dataclass(frozen=True)
-class GroupedGridProfile:
-    """Rendering policy for grouped symbol-grid charts."""
-
-    track: SegmentTrack = field(default_factory=SegmentTrack)
-
-
-@dataclass(frozen=True)
-class ProgressRowsProfile:
-    """Rendering policy for label+bar+count row charts."""
-
-    row_prefix: str = "│ "
-    header_prefix: str = "┌ "
-    spacer_line: str = "│"
-    footer_line: str = "└"
-
-
-@dataclass(frozen=True)
-class TrainingSection:
-    """One titled section for multi-block training charts."""
-
-    title: str
-    total_done: int
-    total_elapsed: int
-    labels: Sequence[str]
-    counts: Sequence[tuple[int, int]]
-    delta_labels: Sequence[str] | None = None
-    bars_override: Sequence[str] | None = None
-    bar_width: int = 30
-    fill_char: str = "■"
-    empty_char: str = "·"
 
 
 @dataclass(frozen=True)
@@ -151,16 +107,17 @@ class VerticalBarSpec:
 class MonthlyTrainingGridSpec:
     """Spec for monthly training grouped grid chart."""
 
+    workout_count: int
+    stretch_count: int
+    elapsed_days: int
     week_labels: Sequence[str]
     week_day_counts: Sequence[int]
     workout_symbols: Sequence[str]
     stretch_symbols: Sequence[str]
-    profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_week_index: int | None = None
     current_day_index: int | None = None
     workout_delta_labels: Sequence[str] | None = None
     stretch_delta_labels: Sequence[str] | None = None
-    legend_line: str | None = None
 
 
 @dataclass(frozen=True)
@@ -171,30 +128,7 @@ class WeeklyTrainingGridSpec:
     stretch_symbols: Sequence[str]
     workout_count: int
     stretch_count: int
-    profile: GroupedGridProfile = field(default_factory=GroupedGridProfile)
     current_index: int | None = None
-
-
-@dataclass(frozen=True)
-class TrainingBlockRowsSpec:
-    """Spec for label+bar+count rows without section framing."""
-
-    labels: Sequence[str]
-    counts: Sequence[tuple[int, int]]
-    delta_labels: Sequence[str] | None = None
-    bar_width: int = 30
-    bars_override: Sequence[str] | None = None
-    fill_char: str = "■"
-    empty_char: str = "·"
-    profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
-
-
-@dataclass(frozen=True)
-class TrainingSectionsRowsSpec:
-    """Spec for multiple titled training row sections."""
-
-    sections: Sequence[TrainingSection]
-    profile: ProgressRowsProfile = field(default_factory=ProgressRowsProfile)
 
 
 @dataclass(frozen=True)
@@ -211,7 +145,5 @@ ChartSpec = (
     VerticalBarSpec
     | MonthlyTrainingGridSpec
     | WeeklyTrainingGridSpec
-    | TrainingBlockRowsSpec
-    | TrainingSectionsRowsSpec
     | TrainingCalendarColumnsSpec
 )

@@ -5,7 +5,6 @@ from __future__ import annotations
 import datetime
 from dataclasses import dataclass
 
-from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.status import SleepPayload
 from sync.contracts.study import StudySessionRecord
 from sync.daily.orchestrator.frontmatter import update_frontmatter
@@ -53,7 +52,6 @@ class DailyNoteComposer:
         *,
         day: datetime.date,
         sessions: list[StudySessionRecord],
-        day_schedule: DayScheduleProfile,
     ) -> DailyComposeResult:
         working_lines = list(lines)
         new_table_lines, study_str = self._build_study_data(
@@ -64,9 +62,7 @@ class DailyNoteComposer:
         ensure_metrics_section(working_lines, yaml_end_idx)
         metrics_result = self._apply_metrics_block(
             working_lines,
-            sessions,
             day,
-            day_schedule,
             new_table_lines,
         )
 
@@ -90,9 +86,7 @@ class DailyNoteComposer:
     def _apply_metrics_block(
         self,
         lines: list[str],
-        sessions: list[StudySessionRecord],
         day: datetime.date,
-        day_schedule: DayScheduleProfile,
         new_table_lines: list[str],
     ) -> _MetricsSectionResult:
         metrics_idx = find_header_idx(lines, "Metrics")

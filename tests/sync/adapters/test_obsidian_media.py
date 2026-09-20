@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from sync.adapters.json_media_cache import JsonMediaDateCacheStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.adapters.obsidian_media import ObsidianMediaSource
 from sync.contracts.media import MediaItem
@@ -733,3 +734,65 @@ def test_scan_ignores_missing_directories_and_malformed_notes(tmp_path: Path) ->
 
     assert bundle.items == ()
     assert cache.saved == []
+
+
+@pytest.mark.parametrize(
+    "relative_path",
+    ["books/.md", "podcasts/.md"],
+)
+def test_empty_media_cache_key_cannot_poison_existing_cache(
+    tmp_path: Path, relative_path: str
+) -> None:
+    path = tmp_path / relative_path
+    path.parent.mkdir(parents=True)
+    _write_note(path, ["completed: 2026-01-10", "date: 2026-01-10", "visible: true"])
+    cache = JsonMediaDateCacheStore(
+        cache_dir=str(tmp_path / "cache"), lock_root=str(tmp_path / "locks")
+    )
+    cache.save({"books": {"Existing": "2026-01-01"}, "podcasts": {}})
+    before = Path(cache.path).read_bytes()
+    source = ObsidianMediaSource(
+        str(tmp_path / "books"),
+        str(tmp_path / "podcasts"),
+        media_cache_store=cache,
+        note_store=_note_store(tmp_path),
+    )
+
+    for _ in range(2):
+        with pytest.raises(ValueError, match="Media cache key must not be empty"):
+            source.scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
+        assert Path(cache.path).read_bytes() == before
+        assert cache.load() == {"books": {"Existing": "2026-01-01"}, "podcasts": {}}
+
+
+@pytest.mark.parametrize(
+    ("relative_path", "bucket", "cache_key"),
+    [
+        ("books/   .md", "books", "   "),
+        ("podcasts/   .md", "podcasts", "   "),
+        ("podcasts/Series/.md", "podcasts", "Series/"),
+        ("podcasts/Series/   .md", "podcasts", "Series/   "),
+        ("podcasts/   /Episode.md", "podcasts", "   /Episode"),
+    ],
+)
+def test_nonempty_media_cache_keys_remain_accepted(
+    tmp_path: Path, relative_path: str, bucket: str, cache_key: str
+) -> None:
+    path = tmp_path / relative_path
+    path.parent.mkdir(parents=True)
+    _write_note(path, ["completed: 2026-01-10", "date: 2026-01-10", "visible: true"])
+    cache = JsonMediaDateCacheStore(
+        cache_dir=str(tmp_path / "cache"), lock_root=str(tmp_path / "locks")
+    )
+    source = ObsidianMediaSource(
+        str(tmp_path / "books"),
+        str(tmp_path / "podcasts"),
+        media_cache_store=cache,
+        note_store=_note_store(tmp_path),
+    )
+
+    first = source.scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
+    second = source.scan(datetime.date(2026, 1, 1), datetime.date(2026, 1, 31))
+
+    assert first == second
+    assert cache.load()[bucket] == {cache_key: "2026-01-10"}

@@ -4,10 +4,19 @@ from __future__ import annotations
 
 import datetime
 
+import pytest
+
 from sync.application.period_sync_service import PeriodSyncService
 from sync.contracts.media import MediaBundle
 from sync.contracts.notes import NotePublication
-from sync.periods.windows import build_week_window, build_year_window
+from sync.contracts.metrics import DailyAggregate
+from sync.dates import daterange
+from sync.metrics import compute_period_metrics
+from sync.periods.windows import (
+    build_month_window,
+    build_week_window,
+    build_year_window,
+)
 
 
 class _StubNoteStore:
@@ -146,3 +155,60 @@ def test_sync_year_writes_metrics(monkeypatch, tmp_path):
     assert written is not None
     assert "year" in written
     assert media_source.calls == [(window.start, window.end)]
+
+
+@pytest.mark.parametrize(
+    ("period", "window", "prior_count"),
+    [
+        ("week", build_week_window(datetime.date(2026, 1, 1)), 4),
+        ("month", build_month_window(datetime.date(2026, 1, 1)), 3),
+        ("year", build_year_window(2026, target_date=datetime.date(2026, 6, 1)), 3),
+    ],
+)
+def test_period_loads_each_day_once_and_preserves_comparison_windows(
+    monkeypatch, tmp_path, period, window, prior_count
+):
+    earliest, _ = window.prior_bounds(prior_count)
+    expected_dates = list(daterange(earliest, window.end))
+    data = {
+        day: DailyAggregate(study_minutes=float(index + 1))
+        for index, day in enumerate(expected_dates)
+        if index % 3 == 0
+    }
+    loads = []
+
+    class Source:
+        def load_for_dates(self, dates):
+            loads.append(dates)
+            return {day: data[day] for day in dates if day in data}
+
+    def render(actual_window, current, previous, media, **kwargs):
+        assert actual_window == window
+        assert current == {
+            day: value
+            for day, value in data.items()
+            if window.start <= day <= window.end
+        }
+        assert previous == {
+            day: value
+            for day, value in data.items()
+            if window.previous_start <= day <= window.previous_end
+        }
+        expected_prior = [
+            compute_period_metrics(list(daterange(*window.prior_bounds(offset))), data)
+            for offset in range(prior_count, 0, -1)
+        ]
+        assert kwargs[f"prior_{period}_metrics"] == expected_prior
+        return ["metrics"]
+
+    builder = {"week": "weekly", "month": "monthly", "year": "yearly"}[period]
+    monkeypatch.setattr(
+        f"sync.application.period_sync_service.build_{builder}_metrics", render
+    )
+    service = PeriodSyncService(_StubNoteStore(), Source(), _StubMediaSource())
+    note_path = str(tmp_path / window.filename)
+    if period == "year":
+        service.sync_year(window, note_path)
+    else:
+        getattr(service, f"sync_{period}")(window, note_path, cleanup_previous=False)
+    assert loads == [expected_dates]

@@ -24,17 +24,19 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
         list(spec.stretch_delta_labels) if spec.stretch_delta_labels else None
     )
 
+    workout_title = f"WORKOUT ({spec.workout_count:02d}/{spec.elapsed_days:02d})"
+    stretch_title = f"STRETCH ({spec.stretch_count:02d}/{spec.elapsed_days:02d})"
     lines: list[str] = []
 
     if not week_day_counts:
         return [
-            "┌ WORKOUT",
+            f"┌ {workout_title}",
             "│",
             "│",
             "│",
             "│",
             "",
-            "┌ STRETCH",
+            f"┌ {stretch_title}",
             "│",
             "│",
             "│",
@@ -80,11 +82,11 @@ def render_monthly_training_grid(spec: MonthlyTrainingGridSpec) -> list[str]:
         return block
 
     lines.extend(
-        _build_activity_block("WORKOUT", workout_symbols, workout_delta_labels)
+        _build_activity_block(workout_title, workout_symbols, workout_delta_labels)
     )
     lines.append("")
     lines.extend(
-        _build_activity_block("STRETCH", stretch_symbols, stretch_delta_labels)
+        _build_activity_block(stretch_title, stretch_symbols, stretch_delta_labels)
     )
 
     return lines

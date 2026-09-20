@@ -6,8 +6,6 @@ Consumes canonical training entries and renders/caches the TRAINING table.
 
 from __future__ import annotations
 
-from collections import OrderedDict
-
 from sync.contracts.state import DailyTrainingStateRow
 from sync.formatting import format_minutes_seconds
 from sync.contracts.status import TrainingEntryPayload, TrainingStatus
@@ -25,22 +23,6 @@ def _parse_time_to_minutes(time_str: str) -> int | None:
         return h * 60 + m
     except (ValueError, AttributeError):
         return None
-
-
-def _load_training_state(
-    date_str: str,
-    state_store: DailyTrainingStateStore,
-) -> list[TrainingTableRow]:
-    entries = state_store.load_for_date(date_str)
-    return entries if isinstance(entries, list) else []
-
-
-def _save_training_state(
-    date_str: str,
-    entries: list[TrainingTableRow],
-    state_store: DailyTrainingStateStore,
-) -> None:
-    state_store.save_for_date(date_str, entries)
 
 
 def _rows_from_canonical_entries(
@@ -87,7 +69,7 @@ def _merge_training_rows(
     existing: list[TrainingTableRow],
     new: list[TrainingTableRow],
 ) -> list[TrainingTableRow]:
-    merged: OrderedDict[tuple[str, str, str, str], TrainingTableRow] = OrderedDict()
+    merged: dict[tuple[str, str, str, str], TrainingTableRow] = {}
 
     def key(entry: TrainingTableRow) -> tuple[str, str, str, str]:
         return (
@@ -175,11 +157,11 @@ def build_training_section(
         training_status.workout_entries
     ) + _rows_from_canonical_entries(training_status.stretch_entries)
 
-    state_rows = _load_training_state(today_str, training_state_store)
+    state_rows = training_state_store.load_for_date(today_str)
     merged_rows: list[TrainingTableRow] = []
     if new_rows:
         merged_rows = _merge_training_rows(state_rows, new_rows)
-        _save_training_state(today_str, merged_rows, training_state_store)
+        training_state_store.save_for_date(today_str, merged_rows)
     elif state_rows:
         merged_rows = state_rows
 

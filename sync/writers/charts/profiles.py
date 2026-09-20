@@ -5,10 +5,7 @@ from __future__ import annotations
 from .specs import (
     AnchorRef,
     ColumnTrack,
-    GroupedGridProfile,
     HAnchor,
-    ProgressRowsProfile,
-    SegmentTrack,
     VerticalBarProfile,
 )
 
@@ -97,26 +94,3 @@ YEARLY_4QTR_METRIC = VerticalBarProfile(
     delta_anchor_ref=AnchorRef.COLUMN,
     delta_anchor_h=HAnchor.START,
 )
-
-TEST_CHART = VerticalBarProfile(
-    height=10,
-    y_max=10,
-    track=ColumnTrack(
-        column_width=12,
-        bar_width=5,
-        bar_left_gutter=3,
-        x_label_prefix=" ",
-        delta_label_prefix=" ",
-        axis_trim=3,
-    ),
-    value_anchor_ref=AnchorRef.COLUMN,
-    value_anchor_h=HAnchor.CENTER,
-    delta_anchor_ref=AnchorRef.LABEL,
-    delta_anchor_h=HAnchor.CENTER,
-)
-
-DEFAULT_GROUPED_GRID_PROFILE = GroupedGridProfile(
-    track=SegmentTrack(row_prefix="│ ", segment_gap="   ", token_sep=" ")
-)
-
-DEFAULT_PROGRESS_ROWS_PROFILE = ProgressRowsProfile()

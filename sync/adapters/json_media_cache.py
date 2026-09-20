@@ -8,8 +8,9 @@ from typing import cast
 from sync.constants import LOCK_DIR, MEDIA_CACHE_DIR
 from sync.contracts.cache import MediaDateCacheState
 from sync.ports.cache import MediaDateCacheStore
+from sync.notes.locking import locked_path
 
-from .json_cache_common import JsonValidatedStateStore, schema_error
+from .json_cache_common import atomic_write_json, load_json_or_none, schema_error
 
 
 def _validate_title_to_date_map(
@@ -53,10 +54,7 @@ def _validate_media_cache(raw: object, *, path: str) -> MediaDateCacheState:
     return {"books": books, "podcasts": podcasts}
 
 
-class JsonMediaDateCacheStore(
-    JsonValidatedStateStore[MediaDateCacheState],
-    MediaDateCacheStore,
-):
+class JsonMediaDateCacheStore(MediaDateCacheStore):
     """Filesystem-backed media date cache."""
 
     def __init__(
@@ -65,10 +63,15 @@ class JsonMediaDateCacheStore(
         cache_dir: str | None = None,
         lock_root: str | None = None,
     ) -> None:
-        self.cache_dir = cache_dir or MEDIA_CACHE_DIR
-        super().__init__(
-            path=os.path.join(self.cache_dir, "dates.json"),
-            lock_root=lock_root or LOCK_DIR,
-            empty_state=lambda: {"books": {}, "podcasts": {}},
-            validator=_validate_media_cache,
-        )
+        self.path = os.path.join(cache_dir or MEDIA_CACHE_DIR, "dates.json")
+        self.lock_root = lock_root or LOCK_DIR
+
+    def load(self) -> MediaDateCacheState:
+        raw = load_json_or_none(self.path)
+        if raw is None:
+            return {"books": {}, "podcasts": {}}
+        return _validate_media_cache(raw, path=self.path)
+
+    def save(self, state: MediaDateCacheState) -> None:
+        with locked_path(self.path, lock_root=self.lock_root):
+            atomic_write_json(self.path, state)

@@ -22,7 +22,9 @@ def _create_flow_db(path: Path) -> None:
             ZCOMPLETEDAT REAL,
             ZTITLE TEXT
         );
-        CREATE TABLE ZINTERRUPTION (ZSESSION INTEGER);
+        CREATE TABLE ZINTERRUPTION (
+            ZSESSION INTEGER, ZSTARTEDAT REAL, ZFINISHEDAT REAL
+        );
         """
     )
     connection.commit()
@@ -216,3 +218,47 @@ def test_undo_session_rejects_a_missing_source_row_before_deleting(
     connection.close()
     assert session_pks == [(10,)]
     assert interruption_pks == [(10,)]
+
+
+@pytest.mark.parametrize("session_count", [3, 1001])
+def test_load_day_aggregates_interruptions_in_batches(
+    tmp_path: Path, session_count: int
+) -> None:
+    db_path = tmp_path / "flow.sqlite"
+    _create_flow_db(db_path)
+    start = datetime.datetime(2026, 8, 10, 9)
+    statements: list[str] = []
+    connection = sqlite3.connect(db_path)
+    connection.executemany(
+        """
+        INSERT INTO ZSESSION
+            (Z_PK, ZPHASE, ZDURATION, ZSTARTEDAT, ZCOMPLETEDAT, ZTITLE)
+        VALUES (?, 'flow', 60, ?, ?, 'Study')
+        """,
+        [
+            (pk, datetime_to_core_data(start), datetime_to_core_data(start) + 3600)
+            for pk in range(1, session_count + 1)
+        ],
+    )
+    connection.executemany(
+        "INSERT INTO ZINTERRUPTION VALUES (?, ?, ?)",
+        [(1, 100, 130), (1, 200, None), (1, 300, 340), (2, 400, None)],
+    )
+    connection.commit()
+    connection.close()
+
+    def connect(readonly: bool) -> sqlite3.Connection:
+        connection = sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+        connection.set_trace_callback(statements.append)
+        return connection
+
+    result = FlowSessionRepository(connection_factory=connect).load_day_sessions(
+        start.date(), now=start + datetime.timedelta(hours=1)
+    )
+    assert result.interruption_totals == {
+        **dict.fromkeys(range(1, session_count + 1), (0, 0.0)),
+        1: (3, 70.0),
+        2: (1, 0.0),
+    }
+    interruption_queries = [query for query in statements if "ZINTERRUPTION" in query]
+    assert len(interruption_queries) <= 2

@@ -15,9 +15,7 @@ venv/
 .ruff_cache/
 .cache/
 .hypothesis/
-.tox/
-.mutmut-cache/
-mutants/
+.import_linter_cache/
 .coverage
 .coverage.*
 htmlcov/

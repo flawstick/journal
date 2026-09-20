@@ -9,7 +9,6 @@ from pathlib import Path
 from sync.adapters.json_daily_state import JsonDailyTrainingStateStore
 from sync.adapters.markdown_notes import MarkdownNoteStore
 from sync.application.daily_sync_service import DailySyncService
-from sync.contracts.schedule import DayScheduleProfile
 from sync.contracts.status import TrainingStatus
 
 
@@ -55,17 +54,6 @@ def _session_for_day(day: datetime.date) -> dict:
     }
 
 
-def _default_schedule() -> DayScheduleProfile:
-    return DayScheduleProfile(
-        study_start=datetime.time(8, 0),
-        study_end=datetime.time(18, 0),
-        lunch_start=datetime.time(13, 30),
-        lunch_end=datetime.time(14, 30),
-        workout_start=datetime.time(18, 0),
-        is_off_day=False,
-    )
-
-
 def _build_service(
     monkeypatch,
     tmp_path,
@@ -95,7 +83,7 @@ def _build_service(
 def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
     day = datetime.date.today()
     service, journal_dir = _build_service(monkeypatch, tmp_path)
-    changed = service.sync_day(day, [_session_for_day(day)], _default_schedule())
+    changed = service.sync_day(day, [_session_for_day(day)])
     assert changed is True
 
     note_path = f"{journal_dir}/{day:%Y-%m-%d}.md"
@@ -112,8 +100,8 @@ def test_sync_day_creates_and_populates_daily_note(monkeypatch, tmp_path):
 def test_sync_day_is_idempotent(monkeypatch, tmp_path):
     day = datetime.date.today()
     service, _ = _build_service(monkeypatch, tmp_path)
-    first = service.sync_day(day, [_session_for_day(day)], _default_schedule())
-    second = service.sync_day(day, [_session_for_day(day)], _default_schedule())
+    first = service.sync_day(day, [_session_for_day(day)])
+    second = service.sync_day(day, [_session_for_day(day)])
     assert first is True
     assert second is False
 
@@ -125,7 +113,6 @@ def test_sync_day_output_uses_canonical_sections_and_schema(monkeypatch, tmp_pat
     changed = service.sync_day(
         fixed_today,
         [_session_for_day(fixed_today)],
-        _default_schedule(),
     )
     assert changed is True
 
@@ -146,7 +133,7 @@ def test_sync_day_output_uses_canonical_sections_and_schema(monkeypatch, tmp_pat
 def test_sync_day_tolerates_missing_sleep_payload(monkeypatch, tmp_path):
     day = datetime.date(2025, 1, 15)
     service, journal_dir = _build_service(monkeypatch, tmp_path)
-    changed = service.sync_day(day, [_session_for_day(day)], _default_schedule())
+    changed = service.sync_day(day, [_session_for_day(day)])
     assert changed is True
     note_path = f"{journal_dir}/{day:%Y-%m-%d}.md"
     content = open(note_path, "r", encoding="utf-8").read()
@@ -169,7 +156,7 @@ def test_sync_day_skips_write_when_note_changes_before_write(
     journal_logger.setLevel(logging.WARNING)
     journal_logger.addHandler(caplog.handler)
     try:
-        changed = service.sync_day(day, [_session_for_day(day)], _default_schedule())
+        changed = service.sync_day(day, [_session_for_day(day)])
     finally:
         journal_logger.removeHandler(caplog.handler)
         journal_logger.setLevel(prior_level)

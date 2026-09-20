@@ -124,36 +124,6 @@ def aggregate_activity_totals(
     return activity_totals
 
 
-def aggregate_interrupt_overrun(
-    dates: list[datetime.date],
-    daily_data: dict[datetime.date, DailyAggregate],
-) -> tuple[float, float, int]:
-    """
-    Aggregate interrupt and overrun minutes across a date range.
-
-    Args:
-        dates: List of date objects to aggregate.
-        daily_data: Dict mapping dates to parsed daily note data.
-
-    Returns:
-        Tuple of (total_interrupts, total_overruns, study_day_count).
-        study_day_count is the number of days with any study (for averaging).
-    """
-    total_interrupts = 0.0
-    total_overruns = 0.0
-    study_day_count = 0
-    for d in dates:
-        daily = daily_data.get(d)
-        if daily is None:
-            continue
-        total_interrupts += daily.get("interrupt_minutes", 0) or 0
-        total_overruns += daily.get("overrun_minutes", 0) or 0
-        study_minutes = daily.get("study_minutes") or 0
-        if study_minutes > 0:
-            study_day_count += 1
-    return total_interrupts, total_overruns, study_day_count
-
-
 def _normalize_training_type_label(label: str) -> str:
     """Normalize a training type label for stable aggregation."""
     return " ".join(label.split()).strip().casefold()

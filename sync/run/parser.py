@@ -3,23 +3,11 @@
 from __future__ import annotations
 
 import argparse
-from collections.abc import Callable, Mapping
 
 from sync.log import add_logging_cli_args
 
-CommandHandler = Callable[[argparse.Namespace], int]
 
-
-def _resolve_handler(
-    handlers: Mapping[str, CommandHandler],
-    key: str,
-) -> CommandHandler:
-    return handlers[key]
-
-
-def build_parser(
-    handlers: Mapping[str, CommandHandler],
-) -> argparse.ArgumentParser:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
     add_logging_cli_args(parser)
     domain = parser.add_subparsers(dest="domain", required=True)
@@ -27,13 +15,9 @@ def build_parser(
     period = domain.add_parser("period", help="Run daily/period journal sync")
     period_sub = period.add_subparsers(dest="period_command", required=True)
 
-    period_all = period_sub.add_parser(
-        "all", help="Run daily + all period sync commands"
-    )
-    period_all.set_defaults(func=_resolve_handler(handlers, "period_all"))
+    period_sub.add_parser("all", help="Run daily + all period sync commands")
 
-    period_daily = period_sub.add_parser("daily", help="Run daily sync")
-    period_daily.set_defaults(func=_resolve_handler(handlers, "period_daily"))
+    period_sub.add_parser("daily", help="Run daily sync")
 
     period_weekly = period_sub.add_parser("weekly", help="Run weekly sync")
     period_weekly.add_argument("--date", help="Date within week (YYYY-MM-DD)")
@@ -42,7 +26,6 @@ def build_parser(
         action="store_true",
         help="Skip cleanup of previous period",
     )
-    period_weekly.set_defaults(func=_resolve_handler(handlers, "period_weekly"))
 
     period_monthly = period_sub.add_parser("monthly", help="Run monthly sync")
     period_monthly.add_argument("--month", help="Month (YYYY-MM)")
@@ -51,11 +34,9 @@ def build_parser(
         action="store_true",
         help="Skip cleanup of previous period",
     )
-    period_monthly.set_defaults(func=_resolve_handler(handlers, "period_monthly"))
 
     period_yearly = period_sub.add_parser("yearly", help="Run yearly sync")
     period_yearly.add_argument("--year", help="Year (YYYY)")
-    period_yearly.set_defaults(func=_resolve_handler(handlers, "period_yearly"))
 
     session = domain.add_parser("session", help="Run Flow session operations")
     session_sub = session.add_subparsers(dest="session_command", required=True)
@@ -65,7 +46,6 @@ def build_parser(
     )
     session_rename.add_argument("title")
     session_rename.add_argument("--confirm", action="store_true")
-    session_rename.set_defaults(func=_resolve_handler(handlers, "session_rename"))
 
     session_undo = session_sub.add_parser(
         "undo", help="Delete most recent focus session"
@@ -77,7 +57,6 @@ def build_parser(
         action="store_true",
         help="Emit a machine-readable preview",
     )
-    session_undo.set_defaults(func=_resolve_handler(handlers, "session_undo"))
 
     session_skip = session_sub.add_parser(
         "skip", help="Execute or manage skip automation"
@@ -87,7 +66,6 @@ def build_parser(
         choices=["toggle", "status"],
         help="Manage launchd skip automation state",
     )
-    session_skip.set_defaults(func=_resolve_handler(handlers, "session_skip"))
 
     session_remind = session_sub.add_parser(
         "remind", help="Execute or manage resume reminder automation"
@@ -97,7 +75,6 @@ def build_parser(
         choices=["toggle", "status"],
         help="Manage launchd remind automation state",
     )
-    session_remind.set_defaults(func=_resolve_handler(handlers, "session_remind"))
 
     grades = domain.add_parser("grades", help="Run grades note operations")
     grades_sub = grades.add_subparsers(dest="grades_command", required=True)
@@ -110,7 +87,6 @@ def build_parser(
         choices=["bsc", "msc"],
         help="Degree whose grades note should be synchronized",
     )
-    grades_sync.set_defaults(func=_resolve_handler(handlers, "grades_sync"))
 
     media = domain.add_parser("media", help="Run media note operations")
     media_sub = media.add_subparsers(dest="media_command", required=True)
@@ -133,7 +109,6 @@ def build_parser(
         "--host",
         help="Override fetched host when metadata lookup fails",
     )
-    media_podcast_add.set_defaults(func=_resolve_handler(handlers, "media_podcast_add"))
 
     media_book = media_sub.add_parser("book", help="Run book note operations")
     media_book_sub = media_book.add_subparsers(dest="book_command", required=True)
@@ -163,9 +138,6 @@ def build_parser(
     media_book_annotations_import.add_argument(
         "--work",
         help="Override the work title to import from anthology exports",
-    )
-    media_book_annotations_import.set_defaults(
-        func=_resolve_handler(handlers, "media_book_annotations_import")
     )
 
     return parser

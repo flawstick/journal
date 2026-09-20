@@ -4,127 +4,23 @@ This repository syncs Flow app focus data into an Obsidian journal and builds da
 
 ## Project Structure
 
-```text
-journal/
-  sync/
-    __init__.py
+- `sync/`: daily and periodic notes, Flow sessions, media, and grades.
+  - `contracts/`: typed data; `ports/`: external integration protocols.
+  - `readers/`, `metrics/`, `writers/`: parse, calculate, render.
+  - `application/`: daily and period orchestration.
+  - `adapters/`: filesystem, status, and media integrations.
+  - `study/`: Flow persistence, session enrichment, read-only study context.
+  - `daily/`, `periods/`: note composition and period-specific presentation.
+  - `notes/`: Markdown operations and note locking.
+  - `run/`: CLI parsing, direct dispatch, and integration construction.
+- `learning/`: records, retrieval, preferences, planning, lessons, and clients.
+- `tests/`: behavior, external integrations, and rendering fixtures.
+- `tools/check.py`: full or package-focused quality checks.
+- `macos/Journal/`: native app and bundled sync runtime.
 
-    config.py                  # Centralized path/env configuration
-    constants.py               # Shared non-I/O constants
-    dates.py                   # Date/period math
-    formatting.py              # Formatting + percent helpers
-    io.py                      # Safe file I/O
-    log.py                     # Logger helper
-
-    contracts/                 # Pure typed contracts (no I/O)
-      study.py
-      sleep.py
-      status.py
-      schedule.py
-      metrics.py
-      media.py
-      grades.py
-      cache.py
-      notes.py
-
-    ports/                     # Stable Protocol interfaces
-      sessions.py
-      status.py
-      schedule.py
-      notes.py
-      daily_aggregates.py
-      media.py
-
-    adapters/                  # Concrete external integrations
-      json_cache_common.py     # Shared validated JSON cache base classes
-      flow_sessions.py
-      icloud_status.py
-      markdown_notes.py
-      markdown_daily_aggregates.py
-      markdown_schedule.py
-      obsidian_media.py
-
-    application/               # Orchestration over ports/contracts
-      daily_sync_service.py
-      period_sync_service.py
-
-    readers/                   # Markdown parsing (markdown -> contracts)
-      schedule.py
-      media.py
-    writers/                   # Rendering (contracts -> markdown)
-      __init__.py
-      charts/                  # Unified chart API (typed specs + renderers)
-        api.py                 # render_chart(spec) -> list[str]
-        specs.py
-        profiles.py
-        layout.py
-        formatters.py
-        renderers/
-      tables/                  # Unified markdown table API (typed specs + renderers)
-        api.py                 # render_table(spec) -> list[str]
-        specs.py
-        layout.py
-        renderers/
-
-    daily/
-      __main__.py              # Daily composition root
-      constants.py
-      sleep.py
-      training.py
-      orchestrator/
-        frontmatter.py
-        note_io.py
-
-    study/
-      __main__.py              # Study CLI composition root
-      constants.py
-      labels.py
-      breaks.py
-      core_data_time.py
-      repository.py
-      enrichment.py
-      section.py
-
-    metrics/
-      aggregation.py
-      trends.py
-
-    notes/
-      locking.py
-      markdown.py
-      markdown_tables.py       # Shared markdown table parse/render helpers
-      sections.py
-
-    periods/
-      __init__.py
-      builders/                # Period-specific metric builders + shared helpers
-        common.py
-        weekly.py
-        monthly.py
-        yearly.py
-      windows.py
-      presentation.py
-      runtime.py
-      sections.py
-      cleanup.py
-
-    run/
-      __main__.py              # Unified runtime composition root
-      parser.py                # CLI parser wiring
-      runtime_deps.py          # Runtime dependency container
-      wiring.py                # Runtime DI wiring + period runners
-      commands/                # Command domain handlers
-        media_common.py
-        media_books.py
-        media_podcast.py
-        media.py               # Small command hub/re-export surface
-
-  tests/
-    sync/
-    fixtures/
-
-  AGENTS.md
-```
+See [docs/architecture.md](docs/architecture.md) for module ownership and the
+learning integration. Existing command lines and rendered notes are compatibility
+requirements; internal Python helpers do not need compatibility aliases.
 
 ## Architecture Rules
 
@@ -145,6 +41,11 @@ journal/
 - `sync/readers` must stay parse-only (no `sync/application`, `sync/adapters`, `sync/writers`, or `sync/run` imports).
 - `sync/periods` must not import `sync/run`.
 - No cross-module private (`_name`) imports in `sync/`.
+- `sync` must not import `learning`.
+- Learning reads journal activity and schedules through
+  `sync.study.context.journal_summary`; it does not import other sync internals.
+- Learning record validation/publication belongs to `learning/records.py`;
+  context selection belongs to `learning/retrieval.py`.
 
 ### Rendering architecture
 
@@ -276,71 +177,24 @@ python3 -m sync.run session remind [--state toggle|status]
 
 ## Quality Gate
 
-Run this standard gate before every commit:
+Run the full gate for changes spanning packages, or the focused gate for one:
 
 ```bash
 source .venv/bin/activate
-tox -e check
+python tools/check.py
+python tools/check.py sync
+python tools/check.py learning
 ```
 
-Equivalent expanded commands:
+The gate runs Ruff lint/format checks, strict mypy, import-linter, and Python
+behavior tests. Sync checks also verify unchanged rendering fixtures; learning
+checks run the Node Pi adapter suite. Node and the installed Pi executable must
+be on `PATH`; Pi tests use this repository's `.venv/bin/python`.
 
-```bash
-source .venv/bin/activate
-ruff check .
-ruff format --check .
-pyright
-mypy sync/ --strict
-vulture sync/ --min-confidence 80
-lint-imports --config .importlinter
-deptry . --pep621-dev-dependency-groups dev --package-module-name-map tox=tox,mutmut=mutmut,pip-audit=pip_audit
-python3 -m pytest tests/ -o addopts="-q --tb=short --cov=sync --cov-branch --cov-report="
-```
-
-Extended strict gate (security + mutation):
-
-```bash
-source .venv/bin/activate
-tox -e extended
-```
-
-`tox -e extended` is mutation-strict. It fails when `mutmut results` reports any
-non-killed status (`survived`, `no tests`, `timeout`, or other non-killed
-states).
-`extended` runs `mutmut` with `--max-children 1` to reduce false timeout noise
-from parallel worker contention.
-
-Literal everything gate (check + extended):
-
-```bash
-source .venv/bin/activate
-tox -e all
-```
-
-Recommended run protocol:
-
-1. Inner loop while editing:
-```bash
-source .venv/bin/activate
-tox -e check
-```
-2. Before every commit:
-```bash
-source .venv/bin/activate
-tox -e check
-```
-3. Before large refactors or release-ready changes:
-```bash
-source .venv/bin/activate
-tox -e all
-```
-
-When debugging a failing test or coverage regression, rerun with verbose reporting:
-
-```bash
-source .venv/bin/activate
-python3 -m pytest tests/ -v --tb=short --cov=sync --cov-branch --cov-report=term-missing:skip-covered
-```
+Add `--coverage` when coverage diagnostics are useful. For failure detail, run
+`python -m pytest tests/ -v --tb=short`. These deterministic checks establish code
+behavior, not teaching efficacy; native-host acceptance is documented in
+`docs/learning-behavioral-acceptance.md`.
 
 ## Testing Guidance
 
@@ -351,7 +205,7 @@ Validate:
 - parsing edge cases: open sessions, malformed shortcut payloads, missing files.
 - period historical flags (`--date`, `--month`, `--year`).
 - architecture-layer test taxonomy under `tests/sync/`:
-  - `architecture/`, `adapters/`, `application/`, `readers/`, `writers/`,
+  - `adapters/`, `application/`, `readers/`, `writers/`,
     `domain/`, `integration/`, `snapshots/`
 
 ## Configuration and Paths
@@ -376,7 +230,8 @@ Path resolution precedence:
 
 Operational guidance:
 
-- Keep LaunchAgents minimal and route scheduled jobs through `python -m sync.run`.
+- Keep LaunchAgents minimal. They invoke `Journal.app --run`, which runs the
+  bundled `python -m sync.run`.
 - Use shell profile exports only for terminal convenience; do not rely on them for launchd jobs.
 - Keep env var names explicit; use clean breaks when storage semantics change.
 - `sync.run session skip` is session-first: it no-ops unless Flow is currently in `Flow` phase and the latest Flow DB row is an open flow session.
@@ -384,11 +239,15 @@ Operational guidance:
 - Logging is stderr-only; no app-level log file sink is used.
 - Launchd writes logs to `/tmp` and the application does not truncate them.
 
-Move checklist (repo relocation):
+Repository relocation:
 
-- Move repo to new location and recreate `.venv` in the new root.
-- Update both LaunchAgent `ProgramArguments`/`WorkingDirectory` paths.
-- Reload both LaunchAgents with `launchctl unload/load`.
+- Recreate `.venv` in the new root and refresh the learning launcher/skill links.
+- Build and install the native bundle with `macos/Journal/build.sh --install`.
+- LaunchAgents keep using `/Applications/Journal.app`; source edits alone do not
+  update their bundled Python code.
+
+The configured `tools/hooks/post-commit` hook rebuilds and installs the app after
+commits touching `sync/` or `macos/`. Run the quality gate before such commits.
 
 ## Data and Cache Files
 
@@ -397,7 +256,7 @@ Move checklist (repo relocation):
 - shortcut pending state: `~/Library/Application Support/Journal/state/daily/status/pending/`
 - shortcut invalid diagnostics: `~/Library/Application Support/Journal/state/daily/status/invalid/` (30-day retention)
 - training state: `~/Library/Application Support/Journal/state/daily/training/YYYY-MM-DD.json` (14-day retention)
-- locks: `~/Library/Application Support/Journal/locks/<shard>/<sha1>.lock` (14-day retention)
+- locks: `~/Library/Application Support/Journal/locks/<shard>/<sha1>.lock` (stable lock files; do not prune by age)
 
 ## LaunchAgents
 
